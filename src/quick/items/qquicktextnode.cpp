@@ -995,7 +995,8 @@ namespace {
                     otherGlyphIndexes += glyphRun.glyphIndexes();
 
                     QVector<QPointF> glyphPositions = glyphRun.positions();
-                    for (int j=0; j<glyphPositions.size(); ++j) {
+                    otherGlyphPositions.reserve(otherGlyphPositions.size() + glyphPositions.size());
+                    for (int j = 0; j < glyphPositions.size(); ++j) {
                         otherGlyphPositions += glyphPositions.at(j) + (node->position - otherNode->position);
                     }
 
