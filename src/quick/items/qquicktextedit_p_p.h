@@ -58,11 +58,14 @@
 #include "qquicktextcontrol_p.h"
 
 #include <QtQml/qqml.h>
+#include <QtCore/QMap>
 
 QT_BEGIN_NAMESPACE
 class QTextLayout;
 class QQuickTextDocumentWithImageResources;
 class QQuickTextControl;
+
+
 class QQuickTextEditPrivate : public QQuickImplicitSizeItemPrivate
 {
 public:
@@ -124,6 +127,7 @@ public:
     QQuickItem* cursorItem;
     QQuickTextDocumentWithImageResources *document;
     QQuickTextControl *control;
+    QMap<int, QQuickTextNode*> textNodeMap;
 
     int lastSelectionStart;
     int lastSelectionEnd;

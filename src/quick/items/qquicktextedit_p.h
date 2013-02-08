@@ -304,6 +304,7 @@ public Q_SLOTS:
 
 private Q_SLOTS:
     void q_textChanged();
+    void q_contentsChanged(int, int, int);
     void updateSelectionMarkers();
     void moveCursorDelegate();
     void createCursor();

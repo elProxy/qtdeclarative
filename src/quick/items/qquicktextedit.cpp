@@ -1792,6 +1792,7 @@ void QQuickTextEditPrivate::init()
     qmlobject_connect(control, QQuickTextControl, SIGNAL(updateRequest()), q, QQuickTextEdit, SLOT(updateDocument()));
     qmlobject_connect(control, QQuickTextControl, SIGNAL(updateCursorRequest()), q, QQuickTextEdit, SLOT(updateCursor()));
     qmlobject_connect(control, QQuickTextControl, SIGNAL(textChanged()), q, QQuickTextEdit, SLOT(q_textChanged()));
+    qmlobject_connect(control, QQuickTextControl, SIGNAL(contentsChanged(int, int, int)), q, QQuickTextEdit, SLOT(q_contentsChanged(int, int, int)));
     qmlobject_connect(control, QQuickTextControl, SIGNAL(selectionChanged()), q, QQuickTextEdit, SIGNAL(selectedTextChanged()));
     qmlobject_connect(control, QQuickTextControl, SIGNAL(selectionChanged()), q, QQuickTextEdit, SLOT(updateSelectionMarkers()));
     qmlobject_connect(control, QQuickTextControl, SIGNAL(cursorPositionChanged()), q, QQuickTextEdit, SLOT(updateSelectionMarkers()));
@@ -1826,6 +1827,11 @@ void QQuickTextEdit::q_textChanged()
     updateSize();
     updateTotalLines();
     emit textChanged();
+}
+
+void QQuickTextEdit::q_contentsChanged(int pos, int charsRemoved, int charsAdded)
+{
+
 }
 
 void QQuickTextEdit::moveCursorDelegate()
