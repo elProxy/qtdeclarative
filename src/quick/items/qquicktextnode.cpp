@@ -971,7 +971,7 @@ namespace {
         typedef QPair<QFontEngine *, QPair<QQuickDefaultClipNode *, QPair<QRgb, int> > > KeyType;
         QHash<KeyType, BinaryTreeNode *> map;
         QList<BinaryTreeNode *> nodes;
-        for (int i=0; i<m_processedNodes.size(); ++i) {
+        for (int i = 0; i < m_processedNodes.size(); ++i) {
             BinaryTreeNode *node = m_processedNodes.data() + i;
 
             if (node->image.isNull()) {
