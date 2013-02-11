@@ -309,7 +309,7 @@ private Q_SLOTS:
     void moveCursorDelegate();
     void createCursor();
     void q_canPasteChanged();
-    void updateDocument();
+    void updateWholeDocument();
     void updateCursor();
     void q_updateAlignment();
     void updateSize();

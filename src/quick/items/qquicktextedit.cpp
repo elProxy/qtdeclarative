@@ -409,7 +409,7 @@ void QQuickTextEdit::setFont(const QFont &font)
             moveCursorDelegate();
         }
         updateSize();
-        updateDocument();
+        updateWholeDocument();
 #ifndef QT_NO_IM
         updateInputMethod(Qt::ImCursorRectangle | Qt::ImFont);
 #endif
@@ -445,7 +445,7 @@ void QQuickTextEdit::setColor(const QColor &color)
         return;
 
     d->color = color;
-    updateDocument();
+    updateWholeDocument();
     emit colorChanged(d->color);
 }
 
@@ -467,7 +467,7 @@ void QQuickTextEdit::setSelectionColor(const QColor &color)
         return;
 
     d->selectionColor = color;
-    updateDocument();
+    updateWholeDocument();
     emit selectionColorChanged(d->selectionColor);
 }
 
@@ -489,7 +489,7 @@ void QQuickTextEdit::setSelectedTextColor(const QColor &color)
         return;
 
     d->selectedTextColor = color;
-    updateDocument();
+    updateWholeDocument();
     emit selectedTextColorChanged(d->selectedTextColor);
 }
 
@@ -1854,7 +1854,7 @@ void QQuickTextEdit::q_contentsChange(int pos, int charsRemoved, int charsAdded)
     Q_UNUSED(charsRemoved);
     Q_UNUSED(charsAdded);
     // FIXME: some sort of smart update here
-    updateDocument();
+    updateWholeDocument();
 }
 
 void QQuickTextEdit::moveCursorDelegate()
@@ -1997,7 +1997,7 @@ void QQuickTextEdit::updateSize()
     }
 }
 
-void QQuickTextEdit::updateDocument()
+void QQuickTextEdit::updateWholeDocument()
 {
     Q_D(QQuickTextEdit);
     if (!d->textNodeMap.isEmpty())
