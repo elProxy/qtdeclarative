@@ -59,13 +59,13 @@
 
 #include <QtQml/qqml.h>
 #include <QtCore/QMap>
+#include <QtCore/QQueue>
 
 QT_BEGIN_NAMESPACE
 class QTextLayout;
 class QQuickTextDocumentWithImageResources;
 class QQuickTextControl;
-
-
+class QQuickTextNode;
 class QQuickTextEditPrivate : public QQuickImplicitSizeItemPrivate
 {
 public:
@@ -86,7 +86,7 @@ public:
         , inputMethodHints(Qt::ImhNone)
 #endif
         , updateType(UpdatePaintNode)
-        , documentDirty(true), dirty(false), richText(false), cursorVisible(false), cursorPending(false)
+        , dirty(false), richText(false), cursorVisible(false), cursorPending(false)
         , focusOnPress(true), persistentSelection(false), requireImplicitWidth(false)
         , selectByMouse(false), canPaste(false), canPasteValid(false), hAlignImplicit(true)
         , textCached(true), inLayout(false)
@@ -128,6 +128,7 @@ public:
     QQuickTextDocumentWithImageResources *document;
     QQuickTextControl *control;
     QMap<int, QQuickTextNode*> textNodeMap;
+    QQueue<QQuickTextNode*> dirtyNodes;
 
     int lastSelectionStart;
     int lastSelectionEnd;
@@ -151,7 +152,6 @@ public:
 #endif
     UpdateType updateType;
 
-    bool documentDirty : 1;
     bool dirty : 1;
     bool richText : 1;
     bool cursorVisible : 1;

@@ -67,106 +67,7 @@
 
 QT_BEGIN_NAMESPACE
 
-/*!
-  Creates an empty QQuickTextNode
-*/
-QQuickTextNode::QQuickTextNode(QSGContext *context, QQuickItem *ownerElement)
-    : m_context(context), m_cursorNode(0), m_ownerElement(ownerElement), m_useNativeRenderer(false)
-{
-#if defined(QML_RUNTIME_TESTING)
-    description = QLatin1String("text");
-#endif
-}
-
-QQuickTextNode::~QQuickTextNode()
-{
-    qDeleteAll(m_textures);
-}
-
-#if 0
-void QQuickTextNode::setColor(const QColor &color)
-{
-    if (m_usePixmapCache) {
-        setUpdateFlag(UpdateNodes);
-    } else {
-        for (QSGNode *childNode = firstChild(); childNode; childNode = childNode->nextSibling()) {
-            if (childNode->subType() == GlyphNodeSubType) {
-                QSGGlyphNode *glyphNode = static_cast<QSGGlyphNode *>(childNode);
-                if (glyphNode->color() == m_color)
-                    glyphNode->setColor(color);
-            } else if (childNode->subType() == SolidRectNodeSubType) {
-                QSGSimpleRectNode *solidRectNode = static_cast<QSGSimpleRectNode *>(childNode);
-                if (solidRectNode->color() == m_color)
-                    solidRectNode->setColor(color);
-            }
-        }
-    }
-    m_color = color;
-}
-
-void QQuickTextNode::setStyleColor(const QColor &styleColor)
-{
-    if (m_textStyle != QQuickTextNode::NormalTextStyle) {
-        if (m_usePixmapCache) {
-            setUpdateFlag(UpdateNodes);
-        } else {
-            for (QSGNode *childNode = firstChild(); childNode; childNode = childNode->nextSibling()) {
-                if (childNode->subType() == GlyphNodeSubType) {
-                    QSGGlyphNode *glyphNode = static_cast<QSGGlyphNode *>(childNode);
-                    if (glyphNode->color() == m_styleColor)
-                        glyphNode->setColor(styleColor);
-                } else if (childNode->subType() == SolidRectNodeSubType) {
-                    QSGSimpleRectNode *solidRectNode = static_cast<QSGSimpleRectNode *>(childNode);
-                    if (solidRectNode->color() == m_styleColor)
-                        solidRectNode->setColor(styleColor);
-                }
-            }
-        }
-    }
-    m_styleColor = styleColor;
-}
-#endif
-
-QSGGlyphNode *QQuickTextNode::addGlyphs(const QPointF &position, const QGlyphRun &glyphs, const QColor &color,
-                                     QQuickText::TextStyle style, const QColor &styleColor,
-                                     QSGNode *parentNode)
-{
-    QSGGlyphNode *node = m_useNativeRenderer
-            ? m_context->createNativeGlyphNode()
-            : m_context->createGlyphNode();
-    node->setOwnerElement(m_ownerElement);
-    node->setGlyphs(position + QPointF(0, glyphs.rawFont().ascent()), glyphs);
-    node->setStyle(style);
-    node->setStyleColor(styleColor);
-    node->setColor(color);
-    node->update();
-
-    /* We flag the geometry as static, but we never call markVertexDataDirty
-       or markIndexDataDirty on them. This is because all text nodes are
-       discarded when a change occurs. If we start appending/removing from
-       existing geometry, then we also need to start marking the geometry as
-       dirty.
-     */
-    node->geometry()->setIndexDataPattern(QSGGeometry::StaticPattern);
-    node->geometry()->setVertexDataPattern(QSGGeometry::StaticPattern);
-
-    if (parentNode == 0)
-        parentNode = this;
-    parentNode->appendChildNode(node);
-
-    return node;
-}
-
-void QQuickTextNode::setCursor(const QRectF &rect, const QColor &color)
-{
-    if (m_cursorNode != 0)
-        delete m_cursorNode;
-
-    m_cursorNode = new QSGSimpleRectNode(rect, color);
-    appendChildNode(m_cursorNode);
-}
-
-namespace {
+namespace QuickTextHelper{
 
     struct BinaryTreeNode {
         enum SelectionState {
@@ -933,7 +834,7 @@ namespace {
         }
     }
 
-    void SelectionEngine::addToSceneGraph(QQuickTextNode *parentNode,
+    void  SelectionEngine::addToSceneGraph(QQuickTextNode *parentNode,
                                           QQuickText::TextStyle style,
                                           const QColor &styleColor)
     {
@@ -1017,7 +918,6 @@ namespace {
             }
         }
 
-        // ...and add clip nodes and glyphs to tree.
         foreach (const BinaryTreeNode *node, nodes) {
 
             QQuickDefaultClipNode *clipNode = node->clipNode;
@@ -1031,6 +931,119 @@ namespace {
             parentNode->addGlyphs(node->position, node->glyphRun, color, style, styleColor, clipNode);
         }
     }
+}
+
+
+namespace {
+
+    class ProtectedLayoutAccessor: public QAbstractTextDocumentLayout
+    {
+    public:
+        inline QTextCharFormat formatAccessor(int pos)
+        {
+            return format(pos);
+        }
+    };
+
+}
+
+/*!
+  Creates an empty QQuickTextNode
+*/
+QQuickTextNode::QQuickTextNode(QSGContext *context, QQuickItem *ownerElement)
+    : m_context(context), m_cursorNode(0), m_ownerElement(ownerElement), m_selectionEngine(0), m_useNativeRenderer(false)
+{
+#if defined(QML_RUNTIME_TESTING)
+    description = QLatin1String("text");
+#endif
+}
+
+QQuickTextNode::~QQuickTextNode()
+{
+    qDeleteAll(m_textures);
+}
+
+#if 0
+void QQuickTextNode::setColor(const QColor &color)
+{
+    if (m_usePixmapCache) {
+        setUpdateFlag(UpdateNodes);
+    } else {
+        for (QSGNode *childNode = firstChild(); childNode; childNode = childNode->nextSibling()) {
+            if (childNode->subType() == GlyphNodeSubType) {
+                QSGGlyphNode *glyphNode = static_cast<QSGGlyphNode *>(childNode);
+                if (glyphNode->color() == m_color)
+                    glyphNode->setColor(color);
+            } else if (childNode->subType() == SolidRectNodeSubType) {
+                QSGSimpleRectNode *solidRectNode = static_cast<QSGSimpleRectNode *>(childNode);
+                if (solidRectNode->color() == m_color)
+                    solidRectNode->setColor(color);
+            }
+        }
+    }
+    m_color = color;
+}
+
+void QQuickTextNode::setStyleColor(const QColor &styleColor)
+{
+    if (m_textStyle != QQuickTextNode::NormalTextStyle) {
+        if (m_usePixmapCache) {
+            setUpdateFlag(UpdateNodes);
+        } else {
+            for (QSGNode *childNode = firstChild(); childNode; childNode = childNode->nextSibling()) {
+                if (childNode->subType() == GlyphNodeSubType) {
+                    QSGGlyphNode *glyphNode = static_cast<QSGGlyphNode *>(childNode);
+                    if (glyphNode->color() == m_styleColor)
+                        glyphNode->setColor(styleColor);
+                } else if (childNode->subType() == SolidRectNodeSubType) {
+                    QSGSimpleRectNode *solidRectNode = static_cast<QSGSimpleRectNode *>(childNode);
+                    if (solidRectNode->color() == m_styleColor)
+                        solidRectNode->setColor(styleColor);
+                }
+            }
+        }
+    }
+    m_styleColor = styleColor;
+}
+#endif
+
+QSGGlyphNode *QQuickTextNode::addGlyphs(const QPointF &position, const QGlyphRun &glyphs, const QColor &color,
+                                     QQuickText::TextStyle style, const QColor &styleColor,
+                                     QSGNode *parentNode)
+{
+    QSGGlyphNode *node = m_useNativeRenderer
+            ? m_context->createNativeGlyphNode()
+            : m_context->createGlyphNode();
+    node->setOwnerElement(m_ownerElement);
+    node->setGlyphs(position + QPointF(0, glyphs.rawFont().ascent()), glyphs);
+    node->setStyle(style);
+    node->setStyleColor(styleColor);
+    node->setColor(color);
+    node->update();
+
+    /* We flag the geometry as static, but we never call markVertexDataDirty
+       or markIndexDataDirty on them. This is because all text nodes are
+       discarded when a change occurs. If we start appending/removing from
+       existing geometry, then we also need to start marking the geometry as
+       dirty.
+     */
+    node->geometry()->setIndexDataPattern(QSGGeometry::StaticPattern);
+    node->geometry()->setVertexDataPattern(QSGGeometry::StaticPattern);
+
+    if (parentNode == 0)
+        parentNode = this;
+    parentNode->appendChildNode(node);
+
+    return node;
+}
+
+void QQuickTextNode::setCursor(const QRectF &rect, const QColor &color)
+{
+    if (m_cursorNode != 0)
+        delete m_cursorNode;
+
+    m_cursorNode = new QSGSimpleRectNode(rect, color);
+    appendChildNode(m_cursorNode);
 }
 
 void QQuickTextNode::mergeFormats(QTextLayout *textLayout,
@@ -1087,16 +1100,157 @@ void QQuickTextNode::mergeFormats(QTextLayout *textLayout,
 
 }
 
-namespace {
+void QQuickTextNode::initSelectionEngine(const QColor& textColor, const QColor& selectedTextColor, const QColor& selectionColor, const QColor& anchorColor)
+{
+    if (m_selectionEngine)
+        delete m_selectionEngine;
 
-    class ProtectedLayoutAccessor: public QAbstractTextDocumentLayout
-    {
-    public:
-        inline QTextCharFormat formatAccessor(int pos)
-        {
-            return format(pos);
+    m_selectionEngine = new QuickTextHelper::SelectionEngine;
+    m_selectionEngine->setTextColor(textColor);
+    m_selectionEngine->setSelectedTextColor(selectedTextColor);
+    m_selectionEngine->setSelectionColor(selectionColor);
+    m_selectionEngine->setAnchorColor(anchorColor);
+}
+
+void QQuickTextNode::addTextBlockToSelectionEngine(QTextDocument *textDocument, const QTextBlock &block, const QPointF &position, const QColor &textColor, const QColor &anchorColor, int selectionStart, int selectionEnd)
+{
+    Q_ASSERT(textDocument);
+#ifndef QT_NO_IM
+    int preeditLength = block.isValid() ? block.layout()->preeditAreaText().length() : 0;
+    int preeditPosition = block.isValid() ? block.layout()->preeditAreaPosition() : -1;
+#endif
+
+    QVarLengthArray<QTextLayout::FormatRange> colorChanges;
+    mergeFormats(block.layout(), &colorChanges);
+
+    QPointF blockPosition = textDocument->documentLayout()->blockBoundingRect(block).topLeft() + position;
+    if (QTextList *textList = block.textList()) {
+        QPointF pos = blockPosition;
+        QTextLayout *layout = block.layout();
+        if (layout->lineCount() > 0) {
+            QTextLine firstLine = layout->lineAt(0);
+            Q_ASSERT(firstLine.isValid());
+
+            m_selectionEngine->setCurrentLine(firstLine);
+
+            QRectF textRect = firstLine.naturalTextRect();
+            pos += textRect.topLeft();
+            if (block.textDirection() == Qt::RightToLeft)
+                pos.rx() += textRect.width();
+
+            const QTextCharFormat charFormat = block.charFormat();
+            QFont font(charFormat.font());
+            QFontMetricsF fontMetrics(font);
+            QTextListFormat listFormat = textList->format();
+
+            QString listItemBullet;
+            switch (listFormat.style()) {
+            case QTextListFormat::ListCircle:
+                listItemBullet = QChar(0x25E6); // White bullet
+                break;
+            case QTextListFormat::ListSquare:
+                listItemBullet = QChar(0x25AA); // Black small square
+                break;
+            case QTextListFormat::ListDecimal:
+            case QTextListFormat::ListLowerAlpha:
+            case QTextListFormat::ListUpperAlpha:
+            case QTextListFormat::ListLowerRoman:
+            case QTextListFormat::ListUpperRoman:
+                listItemBullet = textList->itemText(block);
+                break;
+            default:
+                listItemBullet = QChar(0x2022); // Black bullet
+                break;
+            };
+
+            QSizeF size(fontMetrics.width(listItemBullet), fontMetrics.height());
+            qreal xoff = fontMetrics.width(QLatin1Char(' '));
+            if (block.textDirection() == Qt::LeftToRight)
+                xoff = -xoff - size.width();
+            m_selectionEngine->setPosition(pos + QPointF(xoff, 0));
+
+            QTextLayout layout;
+            layout.setFont(font);
+            layout.setText(listItemBullet); // Bullet
+            layout.beginLayout();
+            QTextLine line = layout.createLine();
+            line.setPosition(QPointF(0, 0));
+            layout.endLayout();
+
+            QList<QGlyphRun> glyphRuns = layout.glyphRuns();
+            for (int i=0; i<glyphRuns.size(); ++i)
+                m_selectionEngine->addUnselectedGlyphs(glyphRuns.at(i));
         }
-    };
+    }
+
+    int textPos = block.position();
+    QTextBlock::iterator blockIterator = block.begin();
+
+    while (!blockIterator.atEnd()) {
+        QTextFragment fragment = blockIterator.fragment();
+        QString text = fragment.text();
+        if (text.isEmpty())
+            continue;
+
+        QTextCharFormat charFormat = fragment.charFormat();
+        m_selectionEngine->setPosition(blockPosition);
+        if (text.contains(QChar::ObjectReplacementCharacter)) {
+            QTextFrame *frame = qobject_cast<QTextFrame *>(textDocument->objectForFormat(charFormat));
+            if (frame && frame->frameFormat().position() == QTextFrameFormat::InFlow) {
+                int blockRelativePosition = textPos - block.position();
+                QTextLine line = block.layout()->lineForTextPosition(blockRelativePosition);
+                if (!m_selectionEngine->currentLine().isValid()
+                        || line.lineNumber() != m_selectionEngine->currentLine().lineNumber()) {
+                    m_selectionEngine->setCurrentLine(line);
+                }
+
+                QuickTextHelper::BinaryTreeNode::SelectionState selectionState =
+                        (selectionStart < textPos + text.length()
+                         && selectionEnd >= textPos)
+                        ? QuickTextHelper::BinaryTreeNode::Selected
+                        : QuickTextHelper::BinaryTreeNode::Unselected;
+
+                m_selectionEngine->addTextObject(QPointF(), charFormat, selectionState, textDocument, textPos);
+            }
+            textPos += text.length();
+        } else {
+            if (charFormat.foreground().style() != Qt::NoBrush)
+                m_selectionEngine->setTextColor(charFormat.foreground().color());
+            else if (charFormat.isAnchor())
+                m_selectionEngine->setTextColor(anchorColor);
+            else
+                m_selectionEngine->setTextColor(textColor);
+
+            int fragmentEnd = textPos + fragment.length();
+#ifndef QT_NO_IM
+            if (preeditPosition >= 0
+                    && preeditPosition >= textPos
+                    && preeditPosition <= fragmentEnd) {
+                fragmentEnd += preeditLength;
+            }
+#endif
+
+            textPos = m_selectionEngine->addText(block, charFormat, textColor, colorChanges, textPos, fragmentEnd,
+                                                 selectionStart, selectionEnd);
+        }
+
+        ++blockIterator;
+    }
+
+#ifndef QT_NO_IM
+    if (preeditLength >= 0 && textPos <= block.position() + preeditPosition) {
+        m_selectionEngine->setPosition(blockPosition);
+        textPos = block.position() + preeditPosition;
+        QTextLine line = block.layout()->lineForTextPosition(preeditPosition);
+        if (!m_selectionEngine->currentLine().isValid()
+                || line.lineNumber() != m_selectionEngine->currentLine().lineNumber()) {
+            m_selectionEngine->setCurrentLine(line);
+        }
+        textPos = m_selectionEngine->addText(block, block.charFormat(), textColor, colorChanges,
+                                             textPos, textPos + preeditLength,
+                                             selectionStart, selectionEnd);
+    }
+#endif
 
 }
 
@@ -1118,11 +1272,7 @@ void QQuickTextNode::addTextDocument(const QPointF &position, QTextDocument *tex
                                   const QColor &selectionColor, const QColor &selectedTextColor,
                                   int selectionStart, int selectionEnd)
 {
-    SelectionEngine engine;
-    engine.setTextColor(textColor);
-    engine.setSelectedTextColor(selectedTextColor);
-    engine.setSelectionColor(selectionColor);
-    engine.setAnchorColor(anchorColor);
+    initSelectionEngine(textColor, selectedTextColor, selectionColor, anchorColor);
 
     QList<QTextFrame *> frames;
     frames.append(textDocument->rootFrame());
@@ -1130,7 +1280,7 @@ void QQuickTextNode::addTextDocument(const QPointF &position, QTextDocument *tex
         QTextFrame *textFrame = frames.takeFirst();
         frames.append(textFrame->childFrames());
 
-        engine.addFrameDecorations(textDocument, textFrame);
+        m_selectionEngine->addFrameDecorations(textDocument, textFrame);
 
         if (textFrame->firstPosition() > textFrame->lastPosition()
          && textFrame->frameFormat().position() != QTextFrameFormat::InFlow) {
@@ -1140,160 +1290,25 @@ void QQuickTextNode::addTextDocument(const QPointF &position, QTextDocument *tex
             QRectF rect = a->frameBoundingRect(textFrame);
 
             QTextBlock block = textFrame->firstCursorPosition().block();
-            engine.setCurrentLine(block.layout()->lineForTextPosition(pos - block.position()));
-            engine.addTextObject(rect.topLeft(), format, BinaryTreeNode::Unselected, textDocument,
+            m_selectionEngine->setCurrentLine(block.layout()->lineForTextPosition(pos - block.position()));
+            m_selectionEngine->addTextObject(rect.topLeft(), format, QuickTextHelper::BinaryTreeNode::Unselected, textDocument,
                                  pos, textFrame->frameFormat().position());
         } else {
             QTextFrame::iterator it = textFrame->begin();
 
             while (!it.atEnd()) {
-                Q_ASSERT(!engine.currentLine().isValid());
+                Q_ASSERT(!m_selectionEngine->currentLine().isValid());
 
                 QTextBlock block = it.currentBlock();
-#ifndef QT_NO_IM
-                int preeditLength = block.isValid() ? block.layout()->preeditAreaText().length() : 0;
-                int preeditPosition = block.isValid() ? block.layout()->preeditAreaPosition() : -1;
-#endif
+                addTextBlockToSelectionEngine(textDocument, block, position, textColor, anchorColor, selectionStart, selectionEnd);
 
-                QVarLengthArray<QTextLayout::FormatRange> colorChanges;
-                mergeFormats(block.layout(), &colorChanges);
-
-                QPointF blockPosition = textDocument->documentLayout()->blockBoundingRect(block).topLeft() + position;
-                if (QTextList *textList = block.textList()) {
-                    QPointF pos = blockPosition;
-                    QTextLayout *layout = block.layout();
-                    if (layout->lineCount() > 0) {
-                        QTextLine firstLine = layout->lineAt(0);
-                        Q_ASSERT(firstLine.isValid());
-
-                        engine.setCurrentLine(firstLine);
-
-                        QRectF textRect = firstLine.naturalTextRect();
-                        pos += textRect.topLeft();
-                        if (block.textDirection() == Qt::RightToLeft)
-                            pos.rx() += textRect.width();
-
-                        const QTextCharFormat charFormat = block.charFormat();
-                        QFont font(charFormat.font());
-                        QFontMetricsF fontMetrics(font);
-                        QTextListFormat listFormat = textList->format();
-
-                        QString listItemBullet;
-                        switch (listFormat.style()) {
-                        case QTextListFormat::ListCircle:
-                            listItemBullet = QChar(0x25E6); // White bullet
-                            break;
-                        case QTextListFormat::ListSquare:
-                            listItemBullet = QChar(0x25AA); // Black small square
-                            break;
-                        case QTextListFormat::ListDecimal:
-                        case QTextListFormat::ListLowerAlpha:
-                        case QTextListFormat::ListUpperAlpha:
-                        case QTextListFormat::ListLowerRoman:
-                        case QTextListFormat::ListUpperRoman:
-                            listItemBullet = textList->itemText(block);
-                            break;
-                        default:
-                            listItemBullet = QChar(0x2022); // Black bullet
-                            break;
-                        };
-
-                        QSizeF size(fontMetrics.width(listItemBullet), fontMetrics.height());
-                        qreal xoff = fontMetrics.width(QLatin1Char(' '));
-                        if (block.textDirection() == Qt::LeftToRight)
-                            xoff = -xoff - size.width();
-                        engine.setPosition(pos + QPointF(xoff, 0));
-
-                        QTextLayout layout;
-                        layout.setFont(font);
-                        layout.setText(listItemBullet); // Bullet
-                        layout.beginLayout();
-                        QTextLine line = layout.createLine();
-                        line.setPosition(QPointF(0, 0));
-                        layout.endLayout();
-
-                        QList<QGlyphRun> glyphRuns = layout.glyphRuns();
-                        for (int i=0; i<glyphRuns.size(); ++i)
-                            engine.addUnselectedGlyphs(glyphRuns.at(i));
-                    }
-                }
-
-                int textPos = block.position();
-                QTextBlock::iterator blockIterator = block.begin();
-
-                while (!blockIterator.atEnd()) {
-                    QTextFragment fragment = blockIterator.fragment();
-                    QString text = fragment.text();
-                    if (text.isEmpty())
-                        continue;
-
-                    QTextCharFormat charFormat = fragment.charFormat();
-                    engine.setPosition(blockPosition);
-                    if (text.contains(QChar::ObjectReplacementCharacter)) {
-                        QTextFrame *frame = qobject_cast<QTextFrame *>(textDocument->objectForFormat(charFormat));
-                        if (frame && frame->frameFormat().position() == QTextFrameFormat::InFlow) {
-                            int blockRelativePosition = textPos - block.position();
-                            QTextLine line = block.layout()->lineForTextPosition(blockRelativePosition);
-                            if (!engine.currentLine().isValid()
-                                    || line.lineNumber() != engine.currentLine().lineNumber()) {
-                                engine.setCurrentLine(line);
-                            }
-
-                            BinaryTreeNode::SelectionState selectionState =
-                                    (selectionStart < textPos + text.length()
-                                     && selectionEnd >= textPos)
-                                    ? BinaryTreeNode::Selected
-                                    : BinaryTreeNode::Unselected;
-
-                            engine.addTextObject(QPointF(), charFormat, selectionState, textDocument, textPos);
-                        }
-                        textPos += text.length();
-                    } else {
-                        if (charFormat.foreground().style() != Qt::NoBrush)
-                            engine.setTextColor(charFormat.foreground().color());
-                        else if (charFormat.isAnchor())
-                            engine.setTextColor(anchorColor);
-                        else
-                            engine.setTextColor(textColor);
-
-                        int fragmentEnd = textPos + fragment.length();
-#ifndef QT_NO_IM
-                        if (preeditPosition >= 0
-                         && preeditPosition >= textPos
-                         && preeditPosition <= fragmentEnd) {
-                            fragmentEnd += preeditLength;
-                        }
-#endif
-
-                        textPos = engine.addText(block, charFormat, textColor, colorChanges, textPos, fragmentEnd,
-                                       selectionStart, selectionEnd);
-                    }
-
-                    ++blockIterator;
-                }
-
-#ifndef QT_NO_IM
-                if (preeditLength >= 0 && textPos <= block.position() + preeditPosition) {
-                    engine.setPosition(blockPosition);
-                    textPos = block.position() + preeditPosition;
-                    QTextLine line = block.layout()->lineForTextPosition(preeditPosition);
-                    if (!engine.currentLine().isValid()
-                            || line.lineNumber() != engine.currentLine().lineNumber()) {
-                        engine.setCurrentLine(line);
-                    }
-                    textPos = engine.addText(block, block.charFormat(), textColor, colorChanges,
-                                             textPos, textPos + preeditLength,
-                                             selectionStart, selectionEnd);
-                }
-#endif
-
-                engine.setCurrentLine(QTextLine()); // Reset current line because the text layout changed
+                m_selectionEngine->setCurrentLine(QTextLine()); // Reset current line because the text layout changed
                 ++it;
             }
         }
     }
 
-    engine.addToSceneGraph(this, style, styleColor);
+    terminateSelectionEngineAndAddNodeToSceneGraph(style, styleColor);
 }
 
 void QQuickTextNode::addTextLayout(const QPointF &position, QTextLayout *textLayout, const QColor &color,
@@ -1303,12 +1318,7 @@ void QQuickTextNode::addTextLayout(const QPointF &position, QTextLayout *textLay
                                 int selectionStart, int selectionEnd,
                                 int lineStart, int lineCount)
 {
-    SelectionEngine engine;
-    engine.setTextColor(color);
-    engine.setSelectedTextColor(selectedTextColor);
-    engine.setSelectionColor(selectionColor);
-    engine.setAnchorColor(anchorColor);
-    engine.setPosition(position);
+    initSelectionEngine(color, selectedTextColor, selectionColor, anchorColor);
 
 #ifndef QT_NO_IM
     int preeditLength = textLayout->preeditAreaText().length();
@@ -1337,11 +1347,11 @@ void QQuickTextNode::addTextLayout(const QPointF &position, QTextLayout *textLay
         }
 #endif
 
-        engine.setCurrentLine(line);
-        engine.addGlyphsForRanges(colorChanges, start, end, selectionStart, selectionEnd);
+        m_selectionEngine->setCurrentLine(line);
+        m_selectionEngine->addGlyphsForRanges(colorChanges, start, end, selectionStart, selectionEnd);
     }
 
-    engine.addToSceneGraph(this, style, styleColor);
+    terminateSelectionEngineAndAddNodeToSceneGraph(style, styleColor);
 }
 
 void QQuickTextNode::deleteContent()
@@ -1426,3 +1436,11 @@ void QQuickTextNode::updateNodes()
 #endif
 
 QT_END_NAMESPACE
+
+void QQuickTextNode::terminateSelectionEngineAndAddNodeToSceneGraph(QQuickText::TextStyle style, const QColor &styleColor)
+{
+    Q_ASSERT(m_selectionEngine);
+    m_selectionEngine->addToSceneGraph(this, style, styleColor);
+    delete m_selectionEngine;
+    m_selectionEngine = 0;
+}

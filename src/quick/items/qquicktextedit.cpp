@@ -1664,8 +1664,7 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
     d->updateType = QQuickTextEditPrivate::UpdateNone;
 
     QSGNode *currentNode = oldNode;
-    if (oldNode == 0 || d->documentDirty) {
-        d->documentDirty = false;
+    if (oldNode == 0 || !d->dirtyNodes.isEmpty()) {
 
         QQuickTextNode *node = 0;
         if (oldNode == 0) {
@@ -1683,6 +1682,27 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
                               QColor(), d->selectionColor, d->selectedTextColor, selectionStart(),
                               selectionEnd() - 1);  // selectionEnd() returns first char after
                                                     // selection
+        // FIXME: temporary one-node logic to be migrated
+        d->textNodeMap.insert(0, node);
+        d->dirtyNodes.clear();
+        /*
+         * Pseudo Logic:
+         *
+         *
+        Delete all dirty text nodes.
+
+        TODO: the backgrounds node probably needs to be part of the book keeping too...
+
+        for all text content effected:
+        create text node
+        node->initSelectionEngine(d->color, d->selectedTextColor, d->selectionColor, QColor());
+
+        do While text Node isn't too big:
+        node->addTextBlockToSelectionEngine();
+
+        node->terminate and add
+
+        */
     }
 
     if (d->cursorComponent == 0 && !isReadOnly()) {
@@ -1791,8 +1811,6 @@ void QQuickTextEditPrivate::init()
 
     qmlobject_connect(control, QQuickTextControl, SIGNAL(updateRequest()), q, QQuickTextEdit, SLOT(updateDocument()));
     qmlobject_connect(control, QQuickTextControl, SIGNAL(updateCursorRequest()), q, QQuickTextEdit, SLOT(updateCursor()));
-    qmlobject_connect(control, QQuickTextControl, SIGNAL(textChanged()), q, QQuickTextEdit, SLOT(q_textChanged()));
-    qmlobject_connect(control, QQuickTextControl, SIGNAL(contentsChanged(int, int, int)), q, QQuickTextEdit, SLOT(q_contentsChanged(int, int, int)));
     qmlobject_connect(control, QQuickTextControl, SIGNAL(selectionChanged()), q, QQuickTextEdit, SIGNAL(selectedTextChanged()));
     qmlobject_connect(control, QQuickTextControl, SIGNAL(selectionChanged()), q, QQuickTextEdit, SLOT(updateSelectionMarkers()));
     qmlobject_connect(control, QQuickTextControl, SIGNAL(cursorPositionChanged()), q, QQuickTextEdit, SLOT(updateSelectionMarkers()));
@@ -1805,6 +1823,7 @@ void QQuickTextEditPrivate::init()
     qmlobject_connect(document, QQuickTextDocumentWithImageResources, SIGNAL(undoAvailable(bool)), q, QQuickTextEdit, SIGNAL(canUndoChanged()));
     qmlobject_connect(document, QQuickTextDocumentWithImageResources, SIGNAL(redoAvailable(bool)), q, QQuickTextEdit, SIGNAL(canRedoChanged()));
     qmlobject_connect(document, QQuickTextDocumentWithImageResources, SIGNAL(imagesLoaded()), q, QQuickTextEdit, SLOT(updateSize()));
+    QObject::connect(document, &QQuickTextDocumentWithImageResources::contentsChange, q, &QQuickTextEdit::q_contentsChange);
 
     document->setDefaultFont(font);
     document->setDocumentMargin(textMargin);
@@ -1829,9 +1848,13 @@ void QQuickTextEdit::q_textChanged()
     emit textChanged();
 }
 
-void QQuickTextEdit::q_contentsChanged(int pos, int charsRemoved, int charsAdded)
+void QQuickTextEdit::q_contentsChange(int pos, int charsRemoved, int charsAdded)
 {
-
+    Q_UNUSED(pos);
+    Q_UNUSED(charsRemoved);
+    Q_UNUSED(charsAdded);
+    // FIXME: some sort of smart update here
+    updateDocument();
 }
 
 void QQuickTextEdit::moveCursorDelegate()
@@ -1972,13 +1995,13 @@ void QQuickTextEdit::updateSize()
     } else {
         d->dirty = true;
     }
-    updateDocument();
 }
 
 void QQuickTextEdit::updateDocument()
 {
     Q_D(QQuickTextEdit);
-    d->documentDirty = true;
+    if (!d->textNodeMap.isEmpty())
+        d->dirtyNodes.append(d->textNodeMap.values());
 
     if (isComponentComplete()) {
         d->updateType = QQuickTextEditPrivate::UpdatePaintNode;

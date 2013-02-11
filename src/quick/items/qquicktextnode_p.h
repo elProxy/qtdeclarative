@@ -61,6 +61,9 @@ class QRawFont;
 class QSGSimpleRectNode;
 class QSGClipNode;
 class QSGTexture;
+namespace QuickTextHelper {
+class SelectionEngine;
+}
 
 class QQuickTextNode : public QSGTransformNode
 {
@@ -106,11 +109,20 @@ public:
 private:
     void mergeFormats(QTextLayout *textLayout, QVarLengthArray<QTextLayout::FormatRange> *mergedFormats);
 
+    // allow for manual operations from the QQuickTextEdit
+    void initSelectionEngine(const QColor &textColor, const QColor &selectedTextColor, const QColor &selectionColor, const QColor& anchorColor);
+    void addTextBlockToSelectionEngine(QTextDocument *, const QTextBlock &, const QPointF &position, const QColor &textColor, const QColor& anchorColor, int selectionStart, int selectionEnd);
+    void terminateSelectionEngineAndAddNodeToSceneGraph(QQuickText::TextStyle style, const QColor &styleColor);
+
+
     QSGContext *m_context;
     QSGSimpleRectNode *m_cursorNode;
     QList<QSGTexture *> m_textures;
     QQuickItem *m_ownerElement;
+    QuickTextHelper::SelectionEngine *m_selectionEngine;
     bool m_useNativeRenderer;
+
+    friend class QQuickTextEdit;
 };
 
 QT_END_NAMESPACE

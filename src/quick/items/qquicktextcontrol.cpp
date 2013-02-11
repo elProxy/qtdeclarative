@@ -583,9 +583,10 @@ QQuickTextControl::QQuickTextControl(QTextDocument *doc, QObject *parent)
     QAbstractTextDocumentLayout *layout = doc->documentLayout();
     qmlobject_connect(layout, QAbstractTextDocumentLayout, SIGNAL(update(QRectF)), this, QQuickTextControl, SIGNAL(updateRequest()));
     qmlobject_connect(layout, QAbstractTextDocumentLayout, SIGNAL(updateBlock(QTextBlock)), this, QQuickTextControl, SIGNAL(updateRequest()));
+//    qmlobject_connect(doc, QTextDocument, SIGNAL(contentsChange(int, int, int)), this, QQuickTextControl, SIGNAL(contentsChange(int, int, int)));
     qmlobject_connect(doc, QTextDocument, SIGNAL(contentsChanged()), this, QQuickTextControl, SLOT(_q_updateCurrentCharFormatAndSelection()));
-    qmlobject_connect(doc, QTextDocument, SIGNAL(contentsChanged(int, int, int)), this, QQuickTextControl, SIGNAL(contentsChanged(int, int, int)));
     qmlobject_connect(doc, QTextDocument, SIGNAL(cursorPositionChanged(QTextCursor)), this, QQuickTextControl, SLOT(_q_emitCursorPosChanged(QTextCursor)));
+    connect(doc, &QTextDocument::contentsChange, this, &QQuickTextControl::contentsChange);
 
     layout->setProperty("cursorWidth", textCursorWidth);
 
