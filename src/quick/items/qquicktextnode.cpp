@@ -1252,6 +1252,7 @@ void QQuickTextNode::addTextBlockToSelectionEngine(QTextDocument *textDocument, 
     }
 #endif
 
+    m_selectionEngine->setCurrentLine(QTextLine()); // Reset current line because the text layout changed
 }
 
 void QQuickTextNode::addImage(const QRectF &rect, const QImage &image)
@@ -1284,6 +1285,7 @@ void QQuickTextNode::addTextDocument(const QPointF &position, QTextDocument *tex
 
         if (textFrame->firstPosition() > textFrame->lastPosition()
          && textFrame->frameFormat().position() != QTextFrameFormat::InFlow) {
+            qDebug() << " !!!!!!!!!!!!  InFlow stuff !!!!!!!!!!!!!";
             const int pos = textFrame->firstPosition() - 1;
             ProtectedLayoutAccessor *a = static_cast<ProtectedLayoutAccessor *>(textDocument->documentLayout());
             QTextCharFormat format = a->formatAccessor(pos);
@@ -1301,8 +1303,6 @@ void QQuickTextNode::addTextDocument(const QPointF &position, QTextDocument *tex
 
                 QTextBlock block = it.currentBlock();
                 addTextBlockToSelectionEngine(textDocument, block, position, textColor, anchorColor, selectionStart, selectionEnd);
-
-                m_selectionEngine->setCurrentLine(QTextLine()); // Reset current line because the text layout changed
                 ++it;
             }
         }

@@ -55,6 +55,7 @@
 #include <QtGui/qpainter.h>
 #include <QtGui/qtextobject.h>
 #include <QtCore/qmath.h>
+#include <QtCore/qalgorithms.h>
 
 #include <private/qqmlglobal_p.h>
 #include <private/qqmlproperty_p.h>
@@ -117,6 +118,10 @@ TextEdit {
     The link must be in rich text or HTML format and the
     \a link string provides access to the particular link.
 */
+
+// FIXME: we probably want something in the thousands range once testing phase is over
+static const int nodeBreakingSize = 30;
+
 QQuickTextEdit::QQuickTextEdit(QQuickItem *parent)
 : QQuickImplicitSizeItem(*(new QQuickTextEditPrivate), parent)
 {
@@ -1654,6 +1659,7 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
 {
     Q_UNUSED(updatePaintNodeData);
     Q_D(QQuickTextEdit);
+    qDebug() << "node index: "<< (qHash(oldNode) % 1000);
 
     if (d->updateType != QQuickTextEditPrivate::UpdatePaintNode && oldNode != 0) {
         // Update done in preprocess() in the nodes
@@ -1664,7 +1670,8 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
     d->updateType = QQuickTextEditPrivate::UpdateNone;
 
     QSGNode *currentNode = oldNode;
-    if (oldNode == 0 || !d->dirtyNodes.isEmpty()) {
+    if (oldNode == 0 || d->dirtyNodes) {
+        d->dirtyNodes = false;
 
         QQuickTextNode *node = 0;
         if (oldNode == 0) {
@@ -1674,17 +1681,59 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
             node = static_cast<QQuickTextNode *>(oldNode);
         }
 
-        node->setUseNativeRenderer(d->renderType == NativeRendering);
-        node->deleteContent();
-        node->setMatrix(QMatrix4x4());
+#define EXPERIMENTAL
+#ifdef EXPERIMENTAL
+        // FIXME: missing frame and decoration logic for now... prototype only !
+        QList<QTextFrame *> frames;
+        frames.append(d->document->rootFrame());
+        while (!frames.isEmpty()) {
+            QTextFrame *textFrame = frames.takeFirst();
+            frames.append(textFrame->childFrames());
+            QTextFrame::iterator it = textFrame->begin();
 
+            QPointF basePosition(d->xoff, d->yoff);
+            QMatrix4x4 transformMatrix;
+            node->setMatrix(transformMatrix);
+            if (oldNode)
+                node->deleteContent();
+            int sizeCounter = 0;
+            int prevBlockStart = 0;
+            node->initSelectionEngine(d->color, d->selectedTextColor, d->selectionColor, QColor());
+            while (!it.atEnd()) {
+                QTextBlock block = it.currentBlock();
+                qDebug() << d->document->blockCount() << block.blockNumber() ;
+
+                node->addTextBlockToSelectionEngine(d->document, block, basePosition, d->color, QColor(), selectionStart(), selectionEnd() - 1);
+                sizeCounter += block.length();
+
+                if (sizeCounter > nodeBreakingSize) {
+                    qDebug() << sizeCounter <<" reached , creating a new node" ;
+                    sizeCounter = 0;
+                    // FIXME: we should get the bounding rect when terminating the node, to use for the next one
+                    node->terminateSelectionEngineAndAddNodeToSceneGraph(QQuickText::Normal, QColor());
+                    d->textNodeMap.append(new QQuickTextEditPrivate::Node(prevBlockStart, node));
+                    prevBlockStart = block.next().position();
+                    //                transformMatrix.translate(node)
+                    node = new QQuickTextNode(QQuickItemPrivate::get(this)->sceneGraphContext(), this);
+                    node->setMatrix(transformMatrix);
+                    node->setUseNativeRenderer(d->renderType == NativeRendering);
+                    node->initSelectionEngine(d->color, d->selectedTextColor, d->selectionColor, QColor());
+                }
+                ++it;
+            }
+            node->terminateSelectionEngineAndAddNodeToSceneGraph(QQuickText::Normal, QColor());
+        }
+#else
+        node->setMatrix(QMatrix4x4());
+        node->deleteContent();
         node->addTextDocument(QPointF(d->xoff, d->yoff), d->document, d->color, QQuickText::Normal, QColor(),
                               QColor(), d->selectionColor, d->selectedTextColor, selectionStart(),
                               selectionEnd() - 1);  // selectionEnd() returns first char after
                                                     // selection
         // FIXME: temporary one-node logic to be migrated
-        d->textNodeMap.insert(0, node);
-        d->dirtyNodes.clear();
+        d->textNodeMap.clear();
+        d->textNodeMap.append(new QQuickTextEditPrivate::Node(0, node));
+#endif
         /*
          * Pseudo Logic:
          *
@@ -1809,7 +1858,7 @@ void QQuickTextEditPrivate::init()
     control->setAcceptRichText(false);
     control->setCursorIsFocusIndicator(true);
 
-    qmlobject_connect(control, QQuickTextControl, SIGNAL(updateRequest()), q, QQuickTextEdit, SLOT(updateDocument()));
+    qmlobject_connect(control, QQuickTextControl, SIGNAL(updateRequest()), q, QQuickTextEdit, SLOT(updateWholeDocument()));
     qmlobject_connect(control, QQuickTextControl, SIGNAL(updateCursorRequest()), q, QQuickTextEdit, SLOT(updateCursor()));
     qmlobject_connect(control, QQuickTextControl, SIGNAL(selectionChanged()), q, QQuickTextEdit, SIGNAL(selectedTextChanged()));
     qmlobject_connect(control, QQuickTextControl, SIGNAL(selectionChanged()), q, QQuickTextEdit, SLOT(updateSelectionMarkers()));
@@ -1848,13 +1897,41 @@ void QQuickTextEdit::q_textChanged()
     emit textChanged();
 }
 
+typedef QQuickTextEditPrivate::Node TextNode;
+
+static bool comesBefore(TextNode* n1, TextNode* n2)
+{
+    return n1->startPos() < n2->startPos();
+}
+
 void QQuickTextEdit::q_contentsChange(int pos, int charsRemoved, int charsAdded)
 {
-    Q_UNUSED(pos);
-    Q_UNUSED(charsRemoved);
-    Q_UNUSED(charsAdded);
-    // FIXME: some sort of smart update here
-    updateWholeDocument();
+    Q_D(QQuickTextEdit);
+//    if (d->textNodeMap.isEmpty())
+//        return;
+
+    const int editRange = pos + qMax(charsAdded, charsRemoved);
+    const int delta = charsAdded - charsRemoved;
+    qDebug() <<" === Pos: " << pos << " ; editRange: " << editRange << "; delta:" << delta;
+
+
+    // mark the affected nodes as dirty
+    TextNode dummyNode(pos, 0);
+    QList<TextNode*>::iterator it = qLowerBound(d->textNodeMap.begin(), d->textNodeMap.end(), &dummyNode, &comesBefore);
+    while (it != d->textNodeMap.constEnd()) {
+        TextNode* node = *it;
+        if (node->startPos() < editRange)
+            node->setDirty();
+        else
+            node->moveStart(delta);
+        ++it;
+    }
+    d->dirtyNodes = true;
+
+    if (isComponentComplete()) {
+        d->updateType = QQuickTextEditPrivate::UpdatePaintNode;
+        update();
+    }
 }
 
 void QQuickTextEdit::moveCursorDelegate()
@@ -2000,8 +2077,11 @@ void QQuickTextEdit::updateSize()
 void QQuickTextEdit::updateWholeDocument()
 {
     Q_D(QQuickTextEdit);
-    if (!d->textNodeMap.isEmpty())
-        d->dirtyNodes.append(d->textNodeMap.values());
+    if (!d->textNodeMap.isEmpty()) {
+        d->dirtyNodes = true;
+        Q_FOREACH (QQuickTextEditPrivate::Node* node, d->textNodeMap)
+            node->setDirty();
+    }
 
     if (isComponentComplete()) {
         d->updateType = QQuickTextEditPrivate::UpdatePaintNode;

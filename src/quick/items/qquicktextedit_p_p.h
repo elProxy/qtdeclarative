@@ -73,6 +73,22 @@ public:
 
     typedef QQuickTextEdit Public;
 
+    struct Node {
+        explicit Node(int startPos, QQuickTextNode* node)
+            : m_startPos(startPos), m_node(node), m_dirty(false) { }
+        QQuickTextNode* textNode() const { return m_node; }
+        void moveStart(int delta) { Q_ASSERT(m_startPos + delta > 0); m_startPos += delta; }
+        int startPos() const { return m_startPos; }
+        void setDirty() { m_dirty = true; }
+        bool dirty() const { return m_dirty; }
+
+    private:
+        int m_startPos;
+        QQuickTextNode* m_node;
+        bool m_dirty;
+    };
+
+
     QQuickTextEditPrivate()
         : color(QRgb(0xFF000000)), selectionColor(QRgb(0xFF000080)), selectedTextColor(QRgb(0xFFFFFFFF))
         , textMargin(0.0), xoff(0), yoff(0), font(sourceFont), cursorComponent(0), cursorItem(0), document(0), control(0)
@@ -127,8 +143,7 @@ public:
     QQuickItem* cursorItem;
     QQuickTextDocumentWithImageResources *document;
     QQuickTextControl *control;
-    QMap<int, QQuickTextNode*> textNodeMap;
-    QQueue<QQuickTextNode*> dirtyNodes;
+    QList<Node*> textNodeMap;
 
     int lastSelectionStart;
     int lastSelectionEnd;
@@ -152,6 +167,7 @@ public:
 #endif
     UpdateType updateType;
 
+    bool dirtyNodes : 1;
     bool dirty : 1;
     bool richText : 1;
     bool cursorVisible : 1;
