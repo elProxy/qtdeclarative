@@ -119,7 +119,7 @@ TextEdit {
     \a link string provides access to the particular link.
 */
 
-// FIXME: we probably want something in the thousands range once testing phase is over
+// FIXME: we probably want something in the 300-3000 range once testing phase is over. Pretty arbitrary anyway
 static const int nodeBreakingSize = 30;
 
 QQuickTextEdit::QQuickTextEdit(QQuickItem *parent)
@@ -1696,11 +1696,12 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
 
             int sizeCounter = 0;
             int prevBlockStart = 0;
+            QPointF nodeOffset;
             node->initSelectionEngine(d->color, d->selectedTextColor, d->selectionColor, QColor());
             while (!it.atEnd()) {
                 QTextBlock block = it.currentBlock();
 
-                node->addTextBlockToSelectionEngine(d->document, block, basePosition, d->color, QColor(), selectionStart(), selectionEnd() - 1);
+                node->addTextBlockToSelectionEngine(d->document, block, basePosition - nodeOffset, d->color, QColor(), selectionStart(), selectionEnd() - 1);
                 sizeCounter += block.length();
 
                 if (sizeCounter > nodeBreakingSize) {
@@ -1710,8 +1711,11 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
                     rootNode->appendChildNode(node);
                     d->textNodeMap.append(new TextNode(prevBlockStart, node));
                     prevBlockStart = block.next().position();
-                    //                transformMatrix.translate(node)
+                    nodeOffset = d->document->documentLayout()->blockBoundingRect(block.next()).topLeft();
                     node = new QQuickTextNode(QQuickItemPrivate::get(this)->sceneGraphContext(), this);
+                    QMatrix4x4 transformMatrix;
+                    transformMatrix.translate(nodeOffset.x(), nodeOffset.y());
+                    node->setMatrix(transformMatrix);
                     node->setUseNativeRenderer(d->renderType == NativeRendering);
                     node->initSelectionEngine(d->color, d->selectedTextColor, d->selectionColor, QColor());
                 }
@@ -1752,15 +1756,18 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
         while (it >= d->textNodeMap.begin() && (*it)->startPos() > cursorPos);
 
         QQuickTextNode *node = (*it)->textNode();
+        // the text node's matrix is always a translation, so we can always invert it.
+        QRectF cursorRect(node->matrix().inverted().mapRect(cursorRectangle()));
+
 
         QColor color = (!d->cursorVisible || !d->control->cursorOn())
                 ? QColor(0, 0, 0, 0)
                 : d->color;
 
         if (node->cursorNode() == 0) {
-            node->setCursor(cursorRectangle(), color);
+            node->setCursor(cursorRect, color);
         } else {
-            node->cursorNode()->setRect(cursorRectangle());
+            node->cursorNode()->setRect(cursorRect);
             node->cursorNode()->setColor(color);
         }
 
