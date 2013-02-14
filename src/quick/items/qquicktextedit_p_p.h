@@ -77,7 +77,7 @@ public:
         explicit Node(int startPos, QQuickTextNode* node)
             : m_startPos(startPos), m_node(node), m_dirty(false) { }
         QQuickTextNode* textNode() const { return m_node; }
-        void moveStart(int delta) { Q_ASSERT(m_startPos + delta > 0); m_startPos += delta; }
+        void moveStartPos(int delta) { Q_ASSERT(m_startPos + delta > 0); m_startPos += delta; }
         int startPos() const { return m_startPos; }
         void setDirty() { m_dirty = true; }
         bool dirty() const { return m_dirty; }
@@ -167,7 +167,6 @@ public:
 #endif
     UpdateType updateType;
 
-    bool dirtyNodes : 1;
     bool dirty : 1;
     bool richText : 1;
     bool cursorVisible : 1;

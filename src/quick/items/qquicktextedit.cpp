@@ -120,7 +120,7 @@ TextEdit {
 */
 
 // FIXME: we probably want something in the 300-3000 range once testing phase is over. Pretty arbitrary anyway
-static const int nodeBreakingSize = 30;
+static const int nodeBreakingSize = 3000;
 
 QQuickTextEdit::QQuickTextEdit(QQuickItem *parent)
 : QQuickImplicitSizeItem(*(new QQuickTextEditPrivate), parent)
@@ -1656,6 +1656,7 @@ void QQuickTextEdit::triggerPreprocess()
 }
 
 typedef QQuickTextEditPrivate::Node TextNode;
+typedef QList<TextNode*>::iterator TextNodeIterator;
 
 QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *updatePaintNodeData)
 {
@@ -1671,35 +1672,56 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
     d->updateType = QQuickTextEditPrivate::UpdateNone;
 
     QSGTransformNode *rootNode = static_cast<QSGTransformNode *>(oldNode);
-    if (!oldNode || d->dirtyNodes) {
-        d->dirtyNodes = false;
+    TextNodeIterator nodeIterator = d->textNodeMap.begin();
+    while (nodeIterator != d->textNodeMap.end() && !(*nodeIterator)->dirty())
+        ++nodeIterator;
+
+
+    if (!oldNode || nodeIterator < d->textNodeMap.end()) {
 
         if (!oldNode)
             rootNode = new QSGTransformNode;
 
         // FIXME: in next iteration, don't delete the non dirty nodes...
-        d->textNodeMap.clear();
-        if (oldNode) {
-            while (rootNode->firstChild())
-                delete rootNode->firstChild();
+
+        int firstDirtyPos = 0;
+        if (nodeIterator != d->textNodeMap.end()) {
+            firstDirtyPos = (*nodeIterator)->startPos();
+            do {
+                rootNode->removeChildNode((*nodeIterator)->textNode());
+                delete (*nodeIterator)->textNode();
+                delete *nodeIterator;
+                nodeIterator = d->textNodeMap.erase(nodeIterator);
+            } while (nodeIterator != d->textNodeMap.end() && (*nodeIterator)->dirty());
         }
-        QQuickTextNode *node = new QQuickTextNode(QQuickItemPrivate::get(this)->sceneGraphContext(), this);
+
+
         // FIXME: missing frame and decoration logic for now... prototype only !
+        QQuickTextNode *node = new QQuickTextNode(QQuickItemPrivate::get(this)->sceneGraphContext(), this);
+        node->initSelectionEngine(d->color, d->selectedTextColor, d->selectionColor, QColor());
+
         QList<QTextFrame *> frames;
         frames.append(d->document->rootFrame());
+
+        int sizeCounter = 0;
+        int prevBlockStart = 0;
+        QPointF basePosition(d->xoff, d->yoff);
+        QPointF nodeOffset;
+        TextNode *firstCleanNode = (nodeIterator != d->textNodeMap.end()) ? *nodeIterator : 0;
+
+
         while (!frames.isEmpty()) {
             QTextFrame *textFrame = frames.takeFirst();
             frames.append(textFrame->childFrames());
             QTextFrame::iterator it = textFrame->begin();
 
-            QPointF basePosition(d->xoff, d->yoff);
-
-            int sizeCounter = 0;
-            int prevBlockStart = 0;
-            QPointF nodeOffset;
-            node->initSelectionEngine(d->color, d->selectedTextColor, d->selectionColor, QColor());
             while (!it.atEnd()) {
                 QTextBlock block = it.currentBlock();
+                ++it;
+                if (block.position() < firstDirtyPos)
+                    continue;
+                if (firstCleanNode && block.next().position() >= firstCleanNode->startPos() ) // last node that needed replacing
+                    break;
 
                 node->addTextBlockToSelectionEngine(d->document, block, basePosition - nodeOffset, d->color, QColor(), selectionStart(), selectionEnd() - 1);
                 sizeCounter += block.length();
@@ -1709,7 +1731,7 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
                     // FIXME: we should get the bounding rect when terminating the node, to use for the next one
                     node->terminateSelectionEngineAndAddNodeToSceneGraph(QQuickText::Normal, QColor());
                     rootNode->appendChildNode(node);
-                    d->textNodeMap.append(new TextNode(prevBlockStart, node));
+                    d->textNodeMap.insert(nodeIterator, new TextNode(prevBlockStart, node));
                     prevBlockStart = block.next().position();
                     nodeOffset = d->document->documentLayout()->blockBoundingRect(block.next()).topLeft();
                     node = new QQuickTextNode(QQuickItemPrivate::get(this)->sceneGraphContext(), this);
@@ -1719,11 +1741,25 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
                     node->setUseNativeRenderer(d->renderType == NativeRendering);
                     node->initSelectionEngine(d->color, d->selectedTextColor, d->selectionColor, QColor());
                 }
-                ++it;
             }
             node->terminateSelectionEngineAndAddNodeToSceneGraph(QQuickText::Normal, QColor());
-            d->textNodeMap.append(new TextNode(prevBlockStart, node));
+            d->textNodeMap.insert(nodeIterator, new TextNode(prevBlockStart, node));
             rootNode->appendChildNode(node);
+
+            // Update the position of the subsequent text blocks.
+            if (firstCleanNode) {
+                QPointF oldOffset = firstCleanNode->textNode()->matrix().map(QPointF(0,0));
+                QPointF currentOffset = d->document->documentLayout()->blockBoundingRect(d->document->findBlock(firstCleanNode->startPos())).topLeft();
+                QPointF delta = currentOffset - oldOffset;
+                while (nodeIterator != d->textNodeMap.end()) {
+                    QMatrix4x4 transformMatrix = (*nodeIterator)->textNode()->matrix();
+                    transformMatrix.translate(delta.x(), delta.y());
+                    (*nodeIterator)->textNode()->setMatrix(transformMatrix);
+                    ++nodeIterator;
+                }
+
+            }
+
         }
 
         /*
@@ -1750,7 +1786,7 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
     if (d->cursorComponent == 0 && !isReadOnly()) {
         // FIXME: we probably need to handle the cursor deletion from the text node that has it when the cursor position changes anyway
         const int cursorPos = cursorPosition();
-        QList<TextNode*>::iterator it = d->textNodeMap.end();
+        TextNodeIterator it = d->textNodeMap.end();
         do
             --it;
         while (it >= d->textNodeMap.begin() && (*it)->startPos() > cursorPos);
@@ -1913,21 +1949,20 @@ void QQuickTextEdit::q_contentsChange(int pos, int charsRemoved, int charsAdded)
 
     const int editRange = pos + qMax(charsAdded, charsRemoved);
     const int delta = charsAdded - charsRemoved;
-    qDebug() <<" === Pos: " << pos << " ; editRange: " << editRange << "; delta:" << delta;
 
 
     // mark the affected nodes as dirty
     TextNode dummyNode(pos, 0);
     QList<TextNode*>::iterator it = qLowerBound(d->textNodeMap.begin(), d->textNodeMap.end(), &dummyNode, &comesBefore);
+//    qDebug() <<" === Pos: " << pos << " ; editRange: " << editRange << "; delta:" << delta << "Node found starts at: " << ((it != d->textNodeMap.constEnd())? (*it)->startPos() : -1);
     while (it != d->textNodeMap.constEnd()) {
         TextNode* node = *it;
         if (node->startPos() < editRange)
             node->setDirty();
         else
-            node->moveStart(delta);
+            node->moveStartPos(delta);
         ++it;
     }
-    d->dirtyNodes = true;
 
     if (isComponentComplete()) {
         d->updateType = QQuickTextEditPrivate::UpdatePaintNode;
@@ -2079,7 +2114,6 @@ void QQuickTextEdit::updateWholeDocument()
 {
     Q_D(QQuickTextEdit);
     if (!d->textNodeMap.isEmpty()) {
-        d->dirtyNodes = true;
         Q_FOREACH (TextNode* node, d->textNodeMap)
             node->setDirty();
     }
