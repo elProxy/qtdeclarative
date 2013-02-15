@@ -1724,7 +1724,7 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
                 node->addTextBlockToSelectionEngine(d->document, block, basePosition - nodeOffset, d->color, QColor(), selectionStart(), selectionEnd() - 1);
                 sizeCounter += block.length();
 
-                if (it.atEnd() || (firstCleanNode && block.next().position() >= firstCleanNode->startPos())) // last node that needed replacing
+                if ((it.atEnd() && frames.isEmpty()) || (firstCleanNode && block.next().position() >= firstCleanNode->startPos())) // last node that needed replacing or last block of the last frame
                     break;
 
                 if (sizeCounter > nodeBreakingSize) {
@@ -1744,44 +1744,26 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
                     node->initSelectionEngine(d->color, d->selectedTextColor, d->selectionColor, QColor());
                 }
             }
-            node->terminateSelectionEngineAndAddNodeToSceneGraph(QQuickText::Normal, QColor());
-            d->textNodeMap.insert(nodeIterator, new TextNode(prevBlockStart, node));
-            rootNode->appendChildNode(node);
+        }
+        node->terminateSelectionEngineAndAddNodeToSceneGraph(QQuickText::Normal, QColor());
+        nodeIterator = d->textNodeMap.insert(nodeIterator, new TextNode(prevBlockStart, node));
+        ++nodeIterator;
+        rootNode->appendChildNode(node);
 
-            // Update the position of the subsequent text blocks.
-            if (firstCleanNode) {
-                QPointF oldOffset = firstCleanNode->textNode()->matrix().map(QPointF(0,0));
-                QPointF currentOffset = d->document->documentLayout()->blockBoundingRect(d->document->findBlock(firstCleanNode->startPos())).topLeft();
-                QPointF delta = currentOffset - oldOffset;
-                while (nodeIterator != d->textNodeMap.end()) {
-                    QMatrix4x4 transformMatrix = (*nodeIterator)->textNode()->matrix();
-                    transformMatrix.translate(delta.x(), delta.y());
-                    (*nodeIterator)->textNode()->setMatrix(transformMatrix);
-                    ++nodeIterator;
-                }
 
+        // Update the position of the subsequent text blocks.
+        if (firstCleanNode) {
+            QPointF oldOffset = firstCleanNode->textNode()->matrix().map(QPointF(0,0));
+            QPointF currentOffset = d->document->documentLayout()->blockBoundingRect(d->document->findBlock(firstCleanNode->startPos())).topLeft();
+            QPointF delta = currentOffset - oldOffset;
+            while (nodeIterator != d->textNodeMap.end()) {
+                QMatrix4x4 transformMatrix = (*nodeIterator)->textNode()->matrix();
+                transformMatrix.translate(delta.x(), delta.y());
+                (*nodeIterator)->textNode()->setMatrix(transformMatrix);
+                ++nodeIterator;
             }
 
         }
-
-        /*
-         * Pseudo Logic:
-         *
-         *
-        Delete all dirty text nodes.
-
-        TODO: the backgrounds node probably needs to be part of the book keeping too...
-
-        for all text content effected:
-        create text node
-        node->initSelectionEngine(d->color, d->selectedTextColor, d->selectionColor, QColor());
-
-        do While text Node isn't too big:
-        node->addTextBlockToSelectionEngine();
-
-        node->terminate and add
-
-        */
     }
 
     Q_ASSERT(!d->textNodeMap.isEmpty());
