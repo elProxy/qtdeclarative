@@ -120,7 +120,7 @@ TextEdit {
 */
 
 // FIXME: we probably want something in the 300-3000 range once testing phase is over. Pretty arbitrary anyway
-static const int nodeBreakingSize = 3000;
+static const int nodeBreakingSize = 30;
 
 QQuickTextEdit::QQuickTextEdit(QQuickItem *parent)
 : QQuickImplicitSizeItem(*(new QQuickTextEditPrivate), parent)
@@ -1720,18 +1720,20 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
                 ++it;
                 if (block.position() < firstDirtyPos)
                     continue;
-                if (firstCleanNode && block.next().position() >= firstCleanNode->startPos() ) // last node that needed replacing
-                    break;
 
                 node->addTextBlockToSelectionEngine(d->document, block, basePosition - nodeOffset, d->color, QColor(), selectionStart(), selectionEnd() - 1);
                 sizeCounter += block.length();
+
+                if (it.atEnd() || (firstCleanNode && block.next().position() >= firstCleanNode->startPos())) // last node that needed replacing
+                    break;
 
                 if (sizeCounter > nodeBreakingSize) {
                     sizeCounter = 0;
                     // FIXME: we should get the bounding rect when terminating the node, to use for the next one
                     node->terminateSelectionEngineAndAddNodeToSceneGraph(QQuickText::Normal, QColor());
+                    nodeIterator = d->textNodeMap.insert(nodeIterator, new TextNode(prevBlockStart, node));
+                    ++nodeIterator;
                     rootNode->appendChildNode(node);
-                    d->textNodeMap.insert(nodeIterator, new TextNode(prevBlockStart, node));
                     prevBlockStart = block.next().position();
                     nodeOffset = d->document->documentLayout()->blockBoundingRect(block.next()).topLeft();
                     node = new QQuickTextNode(QQuickItemPrivate::get(this)->sceneGraphContext(), this);
@@ -1956,7 +1958,7 @@ void QQuickTextEdit::q_contentsChange(int pos, int charsRemoved, int charsAdded)
     TextNodeIterator it = qLowerBound(d->textNodeMap.begin(), d->textNodeMap.end(), &dummyNode, &comesBefore);
     if (it != d->textNodeMap.begin())
         --it;
-    qDebug() <<" === Pos: " << pos << " ; editRange: " << editRange << "; delta:" << delta << "Node found starts at: " << ((it != d->textNodeMap.end())? (*it)->startPos() : -1);
+//    qDebug() <<" === Pos: " << pos << " ; editRange: " << editRange << "; delta:" << delta << "Node found starts at: " << ((it != d->textNodeMap.end())? (*it)->startPos() : -1);
     while (it != d->textNodeMap.constEnd()) {
         if ((*it)->startPos() < editRange)
             (*it)->setDirty();
