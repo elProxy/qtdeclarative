@@ -1704,7 +1704,7 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
         frames.append(d->document->rootFrame());
 
         int sizeCounter = 0;
-        int prevBlockStart = 0;
+        int prevBlockStart = firstDirtyPos;
         QPointF basePosition(d->xoff, d->yoff);
         QPointF nodeOffset;
         TextNode *firstCleanNode = (nodeIterator != d->textNodeMap.end()) ? *nodeIterator : 0;
@@ -1897,7 +1897,7 @@ void QQuickTextEditPrivate::init()
     control->setAcceptRichText(false);
     control->setCursorIsFocusIndicator(true);
 
-    qmlobject_connect(control, QQuickTextControl, SIGNAL(updateRequest()), q, QQuickTextEdit, SLOT(updateWholeDocument()));
+//    qmlobject_connect(control, QQuickTextControl, SIGNAL(updateRequest()), q, QQuickTextEdit, SLOT(updateWholeDocument()));
     qmlobject_connect(control, QQuickTextControl, SIGNAL(updateCursorRequest()), q, QQuickTextEdit, SLOT(updateCursor()));
     qmlobject_connect(control, QQuickTextControl, SIGNAL(selectionChanged()), q, QQuickTextEdit, SIGNAL(selectedTextChanged()));
     qmlobject_connect(control, QQuickTextControl, SIGNAL(selectionChanged()), q, QQuickTextEdit, SLOT(updateSelectionMarkers()));
@@ -1953,14 +1953,15 @@ void QQuickTextEdit::q_contentsChange(int pos, int charsRemoved, int charsAdded)
 
     // mark the affected nodes as dirty
     TextNode dummyNode(pos, 0);
-    QList<TextNode*>::iterator it = qLowerBound(d->textNodeMap.begin(), d->textNodeMap.end(), &dummyNode, &comesBefore);
-//    qDebug() <<" === Pos: " << pos << " ; editRange: " << editRange << "; delta:" << delta << "Node found starts at: " << ((it != d->textNodeMap.constEnd())? (*it)->startPos() : -1);
+    TextNodeIterator it = qLowerBound(d->textNodeMap.begin(), d->textNodeMap.end(), &dummyNode, &comesBefore);
+    if (it != d->textNodeMap.begin())
+        --it;
+    qDebug() <<" === Pos: " << pos << " ; editRange: " << editRange << "; delta:" << delta << "Node found starts at: " << ((it != d->textNodeMap.end())? (*it)->startPos() : -1);
     while (it != d->textNodeMap.constEnd()) {
-        TextNode* node = *it;
-        if (node->startPos() < editRange)
-            node->setDirty();
+        if ((*it)->startPos() < editRange)
+            (*it)->setDirty();
         else
-            node->moveStartPos(delta);
+            (*it)->moveStartPos(delta);
         ++it;
     }
 
@@ -2113,6 +2114,7 @@ void QQuickTextEdit::updateSize()
 void QQuickTextEdit::updateWholeDocument()
 {
     Q_D(QQuickTextEdit);
+    qDebug() << "***** You LOSE ! *****";
     if (!d->textNodeMap.isEmpty()) {
         Q_FOREACH (TextNode* node, d->textNodeMap)
             node->setDirty();
