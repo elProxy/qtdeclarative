@@ -951,7 +951,8 @@ namespace {
   Creates an empty QQuickTextNode
 */
 QQuickTextNode::QQuickTextNode(QSGContext *context, QQuickItem *ownerElement)
-    : m_context(context), m_cursorNode(0), m_ownerElement(ownerElement), m_selectionEngine(0), m_useNativeRenderer(false)
+    : m_context(context), m_cursorNode(0), m_ownerElement(ownerElement), m_selectionEngine(0)
+    , m_textBlockCount(0), m_useNativeRenderer(false)
 {
 #if defined(QML_RUNTIME_TESTING)
     description = QLatin1String("text");
@@ -1105,11 +1106,18 @@ void QQuickTextNode::initSelectionEngine(const QColor& textColor, const QColor& 
     if (m_selectionEngine)
         delete m_selectionEngine;
 
+    m_textBlockCount = 0;
+
     m_selectionEngine = new QuickTextHelper::SelectionEngine;
     m_selectionEngine->setTextColor(textColor);
     m_selectionEngine->setSelectedTextColor(selectedTextColor);
     m_selectionEngine->setSelectionColor(selectionColor);
     m_selectionEngine->setAnchorColor(anchorColor);
+}
+
+int QQuickTextNode::textBlockCount() const
+{
+    return m_textBlockCount;
 }
 
 void QQuickTextNode::addTextBlockToSelectionEngine(QTextDocument *textDocument, const QTextBlock &block, const QPointF &position, const QColor &textColor, const QColor &anchorColor, int selectionStart, int selectionEnd)
@@ -1253,6 +1261,7 @@ void QQuickTextNode::addTextBlockToSelectionEngine(QTextDocument *textDocument, 
 #endif
 
     m_selectionEngine->setCurrentLine(QTextLine()); // Reset current line because the text layout changed
+    ++m_textBlockCount;
 }
 
 void QQuickTextNode::addImage(const QRectF &rect, const QImage &image)

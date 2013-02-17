@@ -1658,6 +1658,11 @@ void QQuickTextEdit::triggerPreprocess()
 typedef QQuickTextEditPrivate::Node TextNode;
 typedef QList<TextNode*>::iterator TextNodeIterator;
 
+static bool comesBefore(TextNode* n1, TextNode* n2)
+{
+    return n1->startPos() < n2->startPos();
+}
+
 QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *updatePaintNodeData)
 {
     Q_UNUSED(updatePaintNodeData);
@@ -1721,6 +1726,13 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
                 if (block.position() < firstDirtyPos)
                     continue;
 
+                if (!node->textBlockCount()) {
+                    nodeOffset = d->document->documentLayout()->blockBoundingRect(block).topLeft();
+                    QMatrix4x4 transformMatrix;
+                    transformMatrix.translate(nodeOffset.x(), nodeOffset.y());
+                    node->setMatrix(transformMatrix);
+                }
+
                 node->addTextBlockToSelectionEngine(d->document, block, basePosition - nodeOffset, d->color, QColor(), selectionStart(), selectionEnd() - 1);
                 sizeCounter += block.length();
 
@@ -1735,11 +1747,7 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
                     ++nodeIterator;
                     rootNode->appendChildNode(node);
                     prevBlockStart = block.next().position();
-                    nodeOffset = d->document->documentLayout()->blockBoundingRect(block.next()).topLeft();
                     node = new QQuickTextNode(QQuickItemPrivate::get(this)->sceneGraphContext(), this);
-                    QMatrix4x4 transformMatrix;
-                    transformMatrix.translate(nodeOffset.x(), nodeOffset.y());
-                    node->setMatrix(transformMatrix);
                     node->setUseNativeRenderer(d->renderType == NativeRendering);
                     node->initSelectionEngine(d->color, d->selectedTextColor, d->selectionColor, QColor());
                 }
@@ -1902,11 +1910,6 @@ void QQuickTextEdit::q_textChanged()
     updateSize();
     updateTotalLines();
     emit textChanged();
-}
-
-static bool comesBefore(TextNode* n1, TextNode* n2)
-{
-    return n1->startPos() < n2->startPos();
 }
 
 void QQuickTextEdit::q_contentsChange(int pos, int charsRemoved, int charsAdded)

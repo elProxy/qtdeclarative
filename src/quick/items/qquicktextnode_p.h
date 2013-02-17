@@ -111,6 +111,7 @@ private:
 
     // allow for manual operations from the QQuickTextEdit
     void initSelectionEngine(const QColor &textColor, const QColor &selectedTextColor, const QColor &selectionColor, const QColor& anchorColor);
+    int textBlockCount() const;
     void addTextBlockToSelectionEngine(QTextDocument *, const QTextBlock &, const QPointF &position, const QColor &textColor, const QColor& anchorColor, int selectionStart, int selectionEnd);
     void terminateSelectionEngineAndAddNodeToSceneGraph(QQuickText::TextStyle style, const QColor &styleColor);
 
@@ -120,6 +121,7 @@ private:
     QList<QSGTexture *> m_textures;
     QQuickItem *m_ownerElement;
     QuickTextHelper::SelectionEngine *m_selectionEngine;
+    int m_textBlockCount;
     bool m_useNativeRenderer;
 
     friend class QQuickTextEdit;
