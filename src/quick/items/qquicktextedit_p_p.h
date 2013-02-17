@@ -66,6 +66,7 @@ class QTextLayout;
 class QQuickTextDocumentWithImageResources;
 class QQuickTextControl;
 class QQuickTextNode;
+class QSGSimpleRectNode;
 class QQuickTextEditPrivate : public QQuickImplicitSizeItemPrivate
 {
 public:
@@ -91,7 +92,8 @@ public:
 
     QQuickTextEditPrivate()
         : color(QRgb(0xFF000000)), selectionColor(QRgb(0xFF000080)), selectedTextColor(QRgb(0xFFFFFFFF))
-        , textMargin(0.0), xoff(0), yoff(0), font(sourceFont), cursorComponent(0), cursorItem(0), document(0), control(0)
+        , textMargin(0.0), xoff(0), yoff(0), font(sourceFont), cursorComponent(0), cursorItem(0), document(0)
+        , control(0), cursorNode(0)
         , lastSelectionStart(0), lastSelectionEnd(0), lineCount(0)
         , hAlign(QQuickTextEdit::AlignLeft), vAlign(QQuickTextEdit::AlignTop)
         , format(QQuickTextEdit::PlainText), wrapMode(QQuickTextEdit::NoWrap)
@@ -144,6 +146,7 @@ public:
     QQuickTextDocumentWithImageResources *document;
     QQuickTextControl *control;
     QList<Node*> textNodeMap;
+    QSGSimpleRectNode *cursorNode;
 
     int lastSelectionStart;
     int lastSelectionEnd;

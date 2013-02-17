@@ -1768,29 +1768,13 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
 
     Q_ASSERT(!d->textNodeMap.isEmpty());
     if (d->cursorComponent == 0 && !isReadOnly()) {
-        // FIXME: we probably need to handle the cursor deletion from the text node that has it when the cursor position changes anyway
-        const int cursorPos = cursorPosition();
-        TextNodeIterator it = d->textNodeMap.end();
-        do
-            --it;
-        while (it >= d->textNodeMap.begin() && (*it)->startPos() > cursorPos);
-
-        QQuickTextNode *node = (*it)->textNode();
-        // the text node's matrix is always a translation, so we can always invert it.
-        QRectF cursorRect(node->matrix().inverted().mapRect(cursorRectangle()));
-
-
         QColor color = (!d->cursorVisible || !d->control->cursorOn())
                 ? QColor(0, 0, 0, 0)
                 : d->color;
 
-        if (node->cursorNode() == 0) {
-            node->setCursor(cursorRect, color);
-        } else {
-            node->cursorNode()->setRect(cursorRect);
-            node->cursorNode()->setColor(color);
-        }
-
+        delete d->cursorNode;
+        d->cursorNode = new QSGSimpleRectNode(cursorRectangle(), color);
+        rootNode->appendChildNode(d->cursorNode);
     }
 
     return rootNode;
