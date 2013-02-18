@@ -316,6 +316,7 @@ private Q_SLOTS:
     void triggerPreprocess();
 
 private:
+    void markDirtyNodesForRange(int start, int end, int charDelta);
     void updateTotalLines();
 
 protected:

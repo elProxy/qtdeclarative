@@ -1912,29 +1912,34 @@ void QQuickTextEdit::q_textChanged()
     emit textChanged();
 }
 
+void QQuickTextEdit::markDirtyNodesForRange(int start, int end, int charDelta)
+{
+    Q_D(QQuickTextEdit);
+    // mark the affected nodes as dirty
+    TextNode dummyNode(start, 0);
+    TextNodeIterator it = qLowerBound(d->textNodeMap.begin(), d->textNodeMap.end(), &dummyNode, &comesBefore);
+    if (it != d->textNodeMap.begin())
+        --it;
+//    qDebug() <<" === Pos: " << start << " ; end: " << end << "; charsAdded:" << charDelta << "Node found starts at: " << ((it != d->textNodeMap.end())? (*it)->startPos() : -1);
+    while (it != d->textNodeMap.constEnd()) {
+        if ((*it)->startPos() < end)
+            (*it)->setDirty();
+        else if (charDelta)
+            (*it)->moveStartPos(charDelta);
+        else
+            break;
+        ++it;
+    }
+}
+
 void QQuickTextEdit::q_contentsChange(int pos, int charsRemoved, int charsAdded)
 {
     Q_D(QQuickTextEdit);
-//    if (d->textNodeMap.isEmpty())
-//        return;
 
     const int editRange = pos + qMax(charsAdded, charsRemoved);
     const int delta = charsAdded - charsRemoved;
 
-
-    // mark the affected nodes as dirty
-    TextNode dummyNode(pos, 0);
-    TextNodeIterator it = qLowerBound(d->textNodeMap.begin(), d->textNodeMap.end(), &dummyNode, &comesBefore);
-    if (it != d->textNodeMap.begin())
-        --it;
-//    qDebug() <<" === Pos: " << pos << " ; editRange: " << editRange << "; delta:" << delta << "Node found starts at: " << ((it != d->textNodeMap.end())? (*it)->startPos() : -1);
-    while (it != d->textNodeMap.constEnd()) {
-        if ((*it)->startPos() < editRange)
-            (*it)->setDirty();
-        else
-            (*it)->moveStartPos(delta);
-        ++it;
-    }
+    markDirtyNodesForRange(pos, editRange, delta);
 
     if (isComponentComplete()) {
         d->updateType = QQuickTextEditPrivate::UpdatePaintNode;
@@ -1959,6 +1964,9 @@ void QQuickTextEdit::moveCursorDelegate()
 void QQuickTextEdit::updateSelectionMarkers()
 {
     Q_D(QQuickTextEdit);
+    int newSelectionStart = d->control->textCursor().selectionStart();
+    int newSelectionEnd = d->control->textCursor().selectionEnd();
+    markDirtyNodesForRange(qMin(d->lastSelectionStart, newSelectionStart), qMax(newSelectionEnd, d->lastSelectionEnd), 0);
     if (d->lastSelectionStart != d->control->textCursor().selectionStart()) {
         d->lastSelectionStart = d->control->textCursor().selectionStart();
         emit selectionStartChanged();
