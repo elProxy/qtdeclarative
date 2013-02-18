@@ -1741,7 +1741,6 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
 
                 if (sizeCounter > nodeBreakingSize) {
                     sizeCounter = 0;
-                    // FIXME: we should get the bounding rect when terminating the node, to use for the next one
                     node->terminateSelectionEngineAndAddNodeToSceneGraph(QQuickText::Normal, QColor());
                     nodeIterator = d->textNodeMap.insert(nodeIterator, new TextNode(prevBlockStart, node));
                     ++nodeIterator;
@@ -1758,7 +1757,7 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
         ++nodeIterator;
         rootNode->appendChildNode(node);
 
-
+        Q_ASSERT(nodeIterator == d->textNodeMap.end() || (*nodeIterator)->textNode() == firstCleanNode);
         // Update the position of the subsequent text blocks.
         if (firstCleanNode) {
             QPointF oldOffset = firstCleanNode->textNode()->matrix().map(QPointF(0,0));
@@ -1774,7 +1773,6 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
         }
     }
 
-    Q_ASSERT(!d->textNodeMap.isEmpty());
     if (d->cursorComponent == 0 && !isReadOnly()) {
         QColor color = (!d->cursorVisible || !d->control->cursorOn())
                 ? QColor(0, 0, 0, 0)
@@ -1873,7 +1871,6 @@ void QQuickTextEditPrivate::init()
     control->setAcceptRichText(false);
     control->setCursorIsFocusIndicator(true);
 
-//    qmlobject_connect(control, QQuickTextControl, SIGNAL(updateRequest()), q, QQuickTextEdit, SLOT(updateWholeDocument()));
     qmlobject_connect(control, QQuickTextControl, SIGNAL(updateCursorRequest()), q, QQuickTextEdit, SLOT(updateCursor()));
     qmlobject_connect(control, QQuickTextControl, SIGNAL(selectionChanged()), q, QQuickTextEdit, SIGNAL(selectedTextChanged()));
     qmlobject_connect(control, QQuickTextControl, SIGNAL(selectionChanged()), q, QQuickTextEdit, SLOT(updateSelectionMarkers()));
@@ -1918,16 +1915,17 @@ void QQuickTextEdit::markDirtyNodesForRange(int start, int end, int charDelta)
     // mark the affected nodes as dirty
     TextNode dummyNode(start, 0);
     TextNodeIterator it = qLowerBound(d->textNodeMap.begin(), d->textNodeMap.end(), &dummyNode, &comesBefore);
+    // qLowerBound gives us the first node past start, rewind by one if we can.
     if (it != d->textNodeMap.begin())
         --it;
 //    qDebug() <<" === Pos: " << start << " ; end: " << end << "; charsAdded:" << charDelta << "Node found starts at: " << ((it != d->textNodeMap.end())? (*it)->startPos() : -1);
     while (it != d->textNodeMap.constEnd()) {
-        if ((*it)->startPos() < end)
+        if ((*it)->startPos() <= end)
             (*it)->setDirty();
         else if (charDelta)
             (*it)->moveStartPos(charDelta);
         else
-            break;
+            return;
         ++it;
     }
 }
