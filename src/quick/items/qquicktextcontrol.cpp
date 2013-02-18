@@ -932,7 +932,7 @@ process:
         }
     }
 
- accept:
+accept:
 
     e->accept();
     cursorOn = true;
@@ -1366,19 +1366,10 @@ void QQuickTextControlPrivate::focusEvent(QFocusEvent *e)
     Q_Q(QQuickTextControl);
     emit q->updateRequest();
     hasFocus = e->gotFocus();
-    if (e->gotFocus()) {
+    if (e->gotFocus())
         setBlinkingCursorEnabled(interactionFlags & (Qt::TextEditable | Qt::TextSelectableByKeyboard));
-    } else {
+    else
         setBlinkingCursorEnabled(false);
-
-        if (cursorIsFocusIndicator
-            && e->reason() != Qt::ActiveWindowFocusReason
-            && e->reason() != Qt::PopupFocusReason
-            && cursor.hasSelection()) {
-            cursor.clearSelection();
-            emit q->selectionChanged();
-        }
-    }
 }
 
 bool QQuickTextControl::hasImState() const
