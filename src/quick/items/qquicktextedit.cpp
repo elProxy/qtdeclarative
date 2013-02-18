@@ -1971,6 +1971,10 @@ void QQuickTextEdit::updateSelectionMarkers()
         d->lastSelectionEnd = d->control->textCursor().selectionEnd();
         emit selectionEndChanged();
     }
+    if (isComponentComplete()) {
+        d->updateType = QQuickTextEditPrivate::UpdatePaintNode;
+        update();
+    }
 }
 
 QRectF QQuickTextEdit::boundingRect() const
