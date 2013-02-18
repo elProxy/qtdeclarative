@@ -1962,9 +1962,7 @@ void QQuickTextEdit::moveCursorDelegate()
 void QQuickTextEdit::updateSelectionMarkers()
 {
     Q_D(QQuickTextEdit);
-    int newSelectionStart = d->control->textCursor().selectionStart();
-    int newSelectionEnd = d->control->textCursor().selectionEnd();
-    markDirtyNodesForRange(qMin(d->lastSelectionStart, newSelectionStart), qMax(newSelectionEnd, d->lastSelectionEnd), 0);
+    markDirtyNodesForRange(qMin(d->lastSelectionStart, d->control->textCursor().selectionStart()), qMax(d->control->textCursor().selectionEnd(), d->lastSelectionEnd), 0);
     if (d->lastSelectionStart != d->control->textCursor().selectionStart()) {
         d->lastSelectionStart = d->control->textCursor().selectionStart();
         emit selectionStartChanged();
