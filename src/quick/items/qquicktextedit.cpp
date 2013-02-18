@@ -1961,6 +1961,7 @@ void QQuickTextEdit::updateSelectionMarkers()
 {
     Q_D(QQuickTextEdit);
     markDirtyNodesForRange(qMin(d->lastSelectionStart, d->control->textCursor().selectionStart()), qMax(d->control->textCursor().selectionEnd(), d->lastSelectionEnd), 0);
+    updateSize();
     if (d->lastSelectionStart != d->control->textCursor().selectionStart()) {
         d->lastSelectionStart = d->control->textCursor().selectionStart();
         emit selectionStartChanged();
