@@ -120,7 +120,7 @@ TextEdit {
 */
 
 // FIXME: we probably want something in the 300-3000 range once testing phase is over. Pretty arbitrary anyway
-static const int nodeBreakingSize = 30;
+static const int nodeBreakingSize = 300;
 
 QQuickTextEdit::QQuickTextEdit(QQuickItem *parent)
 : QQuickImplicitSizeItem(*(new QQuickTextEditPrivate), parent)
@@ -1686,8 +1686,6 @@ QSGNode *QQuickTextEdit::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *
 
         if (!oldNode)
             rootNode = new QSGTransformNode;
-
-        // FIXME: in next iteration, don't delete the non dirty nodes...
 
         int firstDirtyPos = 0;
         if (nodeIterator != d->textNodeMap.end()) {
